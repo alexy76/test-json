@@ -1,19 +1,12 @@
-// Chargement du fichier movies.json dans le LocalStorage (stockage du fichier .json dans l'environnement du navigateur)
-const getJsonStringify = async () => {
-    const response = await fetch("assets/json/movies.json")
-    response.ok ? localStorage.setItem("wik", JSON.stringify(await response.json())) : alert('Impossible de charger le fichier movies.json')
-}
-// SI le fichier n'a pas été stocké dans le navigateur ALORS on fait appel à la fonction pour le charger et on reload la page
 if (localStorage.getItem("wik") === null) {
-    getJsonStringify()
-    location.reload()
+    let obj = {results : []}
+    localStorage.setItem("wik", JSON.stringify(obj))
 }
 
-
-
-// **************DEBUT SCRIPT*****************//
 const btnPagination = document.getElementById("btnPagination")
+const pushInJson = document.getElementById("pushInJson")
 let arrayBtnDelete
+let myApiKey = ""      // ATTENTION : METTRE VOTRE API KEY du SITE : https://imdb-api.com/
 let myObjJson = JSON.parse(localStorage.getItem("wik"))  //    <----- on récupère le fichier .json depuis le local storage
 
 
@@ -36,18 +29,83 @@ btnPagination.addEventListener("click", (e) => {
 
 // Recherche de nouveau film dans la modale ! (en cours de conception)
 document.getElementById("displayAddMovie").addEventListener("click", () => {
-    fetch(`https://imdb-api.com/en/API/SearchMovie/k_4tz89vls/${document.getElementById("valueMovie").value}`)
+
+    if(document.getElementById("valueMovie").value == ""){
+        alert("Vous devez entrer un nom de film")
+    }else{
+        fetch(`https://imdb-api.com/en/API/SearchMovie/${myApiKey}/${document.getElementById("valueMovie").value}`)
         .then(response => response.json())
         .then(data => {
+
             document.getElementById("valueMovie").value = ""
             document.getElementById("displaySearchMovie").innerHTML = ""
             data.results.forEach(element => {
-                 document.getElementById("displaySearchMovie").innerHTML += `<img src="${element.image}" alt="${element.title}" data-id="${element.id}" width="100%">`
+                 document.getElementById("displaySearchMovie").innerHTML += `<img id="${element.id}" class="searchingMovie" src="${element.image}" alt="${element.title}" data-id="${element.id}" width="100%">`
             })
+
+            let arraySearchingMovie = Array.from(document.getElementsByClassName("searchingMovie"))
+
+            arraySearchingMovie.forEach(element => {
+            element.addEventListener('click', (e) => {
+                if(e.target.nodeName = "IMG"){
+                    e.target.classList.toggle("active")
+                }
+            })
+        })
         })
         .catch(err => {
             console.error(err);
         });
+    }
+
+})
+
+pushInJson.addEventListener("click", (e) => {
+
+    let arraySearchingMovie = Array.from(document.getElementsByClassName("active"))
+    let eltForPush = []
+
+    if(arraySearchingMovie.length == 0){
+        alert("Attention, aucun film n'a été selectionné !")
+    }else{
+
+        arraySearchingMovie.forEach((element, index) => {
+            if(element.className == "searchingMovie active"){
+                eltForPush.push(index)
+            }
+        })
+    
+        if(eltForPush.length == 1){
+    
+            fetch(`https://imdb-api.com/fr/API/Title/${myApiKey}/${arraySearchingMovie[eltForPush[0]].id}`)
+            .then(response => response.json())
+            .then(data => {
+    
+                let title = data.originalTitle == "" ? data.title : data.originalTitle
+                let synopsis = data.plotLocal == "" ? data.plot : data.plotLocal
+    
+                getMyNewObj()
+    
+                myObjJson.results.unshift({
+                    id: `${data.id}`,
+                    original_title: `${title}`,
+                    overview: `${synopsis}`,
+                    poster_path: `${data.image}`,
+                    vote_average: `${data.imDbRating}`
+                })
+    
+                setMyNewObj()
+    
+                location.reload()
+    
+                
+            })
+    
+        }else{
+            alert("Attention plusieurs élements sont sélectionnés")
+        }
+    }
+
 })
 
 
@@ -116,17 +174,15 @@ function generateCards(myObj, min, max) {
 
 
             getMyNewObj()
-            console.log(myObjJson)
 
             myObjJson.results.forEach((value, index) => {
                 if (index == element.dataset.index) {
-                    console.log(index)
+
                     myObjJson.results.splice(index, 1)
                     setMyNewObj()
                     location.reload()
                 }
             })
-            console.log(myObjJson)
         })
     })
 }
@@ -143,6 +199,8 @@ function setMyNewObj() {
 
 // Bouton permettant de recharger le fichier .json d'origine 
 reload.addEventListener("click", () => {
-    localStorage.clear()
-    location.reload()
+    if(confirm("Warning : Cette action est irréversible, êtes-vous certain de vouloir effacer vos favoris ?")){
+        localStorage.clear()
+        location.reload()
+    }
 })
